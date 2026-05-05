@@ -89,7 +89,8 @@ class CameraViewModel : ViewModel() {
 
     /**
      * Vincula la cámara al ciclo de vida y configura Preview + VideoCapture.
-     * Desactiva la estabilización digital para no distorsionar el tamaño de la pupila.
+     * Nota: la estabilización digital no tiene API directa en CameraX 1.3.x;
+     * al usar máxima calidad y sin extensiones extra se minimiza el procesado.
      */
     fun bindCamera(
         context: Context,
@@ -104,7 +105,7 @@ class CameraViewModel : ViewModel() {
                 .build()
                 .also { it.setSurfaceProvider(previewView.surfaceProvider) }
 
-            // Máxima calidad disponible; sin estabilización
+            // Máxima calidad disponible en el dispositivo
             val recorder = Recorder.Builder()
                 .setQualitySelector(
                     QualitySelector.fromOrderedList(
@@ -113,9 +114,8 @@ class CameraViewModel : ViewModel() {
                 )
                 .build()
 
-            videoCapture = VideoCapture.Builder(recorder)
-                .setVideoStabilizationEnabled(false) // Desactivar estabilización digital
-                .build()
+            // VideoCapture usando withOutput (API estable de CameraX 1.3.x)
+            videoCapture = VideoCapture.withOutput(recorder)
 
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
@@ -145,7 +145,10 @@ class CameraViewModel : ViewModel() {
         y: Float
     ) {
         val point = meteringPointFactory.createPoint(x, y)
-        val action = FocusMeteringAction.Builder(point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE)
+        val action = FocusMeteringAction.Builder(
+            point,
+            FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+        )
             .setAutoCancelDuration(5, TimeUnit.SECONDS)
             .build()
 
@@ -195,14 +198,18 @@ class CameraViewModel : ViewModel() {
             settings.tiempoBasal + settings.duracionFlash + settings.tiempoRedilatacion
 
         // Nombre de archivo con timestamp
-        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(System.currentTimeMillis())
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault())
+            .format(System.currentTimeMillis())
         val fileName = "Pupilometro_$timestamp"
 
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
             put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Video.Media.RELATIVE_PATH, Environment.DIRECTORY_MOVIES + "/Pupilometro")
+                put(
+                    MediaStore.Video.Media.RELATIVE_PATH,
+                    Environment.DIRECTORY_MOVIES + "/Pupilometro"
+                )
             }
         }
 
@@ -237,7 +244,7 @@ class CameraViewModel : ViewModel() {
                 }
             }
 
-        // Ejecutar protocolo asíncrono con tiempos precisos
+        // Ejecutar protocolo asíncrono con tiempos de alta precisión
         viewModelScope.launch {
             val startTime = System.currentTimeMillis()
 
