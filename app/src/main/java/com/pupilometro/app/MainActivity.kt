@@ -21,6 +21,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
+import com.pupilometro.app.ui.screens.AboutScreen
 import com.pupilometro.app.ui.screens.CameraScreen
 import com.pupilometro.app.ui.screens.SettingsScreen
 import com.pupilometro.app.ui.theme.PupilometroTheme
@@ -53,7 +54,6 @@ fun PupilometroApp(
 ) {
     val navController = rememberNavController()
 
-    // Permisos requeridos
     val permissions = rememberMultiplePermissionsState(
         permissions = listOf(
             Manifest.permission.CAMERA,
@@ -62,26 +62,27 @@ fun PupilometroApp(
     )
 
     if (!permissions.allPermissionsGranted) {
-        // Pantalla de solicitud de permisos
         PermissionsScreen(
             onRequestPermissions = { permissions.launchMultiplePermissionRequest() },
             shouldShowRationale = permissions.shouldShowRationale
         )
     } else {
-        // Navegación principal
-        NavHost(
-            navController = navController,
-            startDestination = "camera"
-        ) {
+        NavHost(navController = navController, startDestination = "camera") {
             composable("camera") {
                 CameraScreen(
                     viewModel = cameraViewModel,
-                    onNavigateToSettings = { navController.navigate("settings") }
+                    onNavigateToSettings = { navController.navigate("settings") },
+                    onNavigateToAbout = { navController.navigate("about") }
                 )
             }
             composable("settings") {
                 SettingsScreen(
                     viewModel = settingsViewModel,
+                    onNavigateBack = { navController.popBackStack() }
+                )
+            }
+            composable("about") {
+                AboutScreen(
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
@@ -129,12 +130,7 @@ fun PermissionsScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0)),
                 modifier = Modifier.fillMaxWidth().height(52.dp)
             ) {
-                Text(
-                    "Conceder Permisos",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
+                Text("Conceder Permisos", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
     }

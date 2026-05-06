@@ -30,7 +30,8 @@ import com.pupilometro.app.viewmodel.RecordingState
 @Composable
 fun CameraScreen(
     viewModel: CameraViewModel,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToAbout: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -50,7 +51,6 @@ fun CameraScreen(
         label = "progress"
     )
 
-    // Color del indicador según fase
     val phaseColor = when (recordingState) {
         is RecordingState.FlashOn -> Color(0xFFFFD600)
         is RecordingState.RecordingBasal -> Color(0xFF4CAF50)
@@ -58,7 +58,6 @@ fun CameraScreen(
         else -> Color.White
     }
 
-    // Etiqueta de fase
     val phaseLabel = when (recordingState) {
         is RecordingState.RecordingBasal -> "FASE BASAL"
         is RecordingState.FlashOn -> "⚡ FLASH"
@@ -87,15 +86,13 @@ fun CameraScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
-                    detectTapGestures { offset ->
-                        if (!isRecording) {
-                            // Tap-to-focus usando coordenadas del toque
-                        }
+                    detectTapGestures { _ ->
+                        if (!isRecording) { /* tap-to-focus handled via viewModel */ }
                     }
                 }
         )
 
-        // --- OVERLAY SUPERIOR: título y settings ---
+        // --- OVERLAY SUPERIOR ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -113,15 +110,10 @@ fun CameraScreen(
                     modifier = Modifier.size(24.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Pupilómetro",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
-                )
+                Text("Pupilómetro", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
             }
-            // Indicador de foco
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Indicador foco
                 Box(
                     modifier = Modifier
                         .size(10.dp)
@@ -134,18 +126,19 @@ fun CameraScreen(
                     color = Color.White,
                     fontSize = 12.sp
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                // Botón Settings
                 IconButton(onClick = onNavigateToSettings, enabled = !isRecording) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Ajustes",
-                        tint = Color.White
-                    )
+                    Icon(Icons.Default.Settings, contentDescription = "Ajustes", tint = Color.White)
+                }
+                // Botón About
+                IconButton(onClick = onNavigateToAbout, enabled = !isRecording) {
+                    Icon(Icons.Default.Info, contentDescription = "Acerca de", tint = Color.White)
                 }
             }
         }
 
-        // --- BARRA DE PROGRESO y etiqueta de fase ---
+        // --- BARRA DE PROGRESO ---
         AnimatedVisibility(
             visible = isRecording || recordingState is RecordingState.Finished,
             modifier = Modifier
@@ -165,8 +158,7 @@ fun CameraScreen(
                     Text(phaseLabel, color = phaseColor, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                     Text(
                         "${(progressMs / 1000.0).let { "%.1f".format(it) }}s / ${totalDurationMs / 1000}s",
-                        color = Color.White,
-                        fontSize = 12.sp
+                        color = Color.White, fontSize = 12.sp
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
@@ -179,12 +171,8 @@ fun CameraScreen(
             }
         }
 
-        // --- MENSAJE DE ESTADO ---
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(horizontal = 32.dp)
-        ) {
+        // --- MENSAJE MODAL (error, foco, completado) ---
+        Box(modifier = Modifier.align(Alignment.Center).padding(horizontal = 32.dp)) {
             if (recordingState is RecordingState.WaitingFocusLock ||
                 recordingState is RecordingState.Finished ||
                 recordingState is RecordingState.Error
@@ -219,7 +207,6 @@ fun CameraScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Mensaje de estado (cuando no es modal)
             if (!isRecording &&
                 recordingState !is RecordingState.WaitingFocusLock &&
                 recordingState !is RecordingState.Finished &&
@@ -239,39 +226,35 @@ fun CameraScreen(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-
                 // Botón Fijar / Desbloquear Foco
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    FilledTonalButton(
-                        onClick = {
-                            if (isFocusLocked) viewModel.unlockFocus()
-                            else viewModel.lockFocusAndExposure()
-                        },
-                        enabled = !isRecording,
-                        colors = ButtonDefaults.filledTonalButtonColors(
-                            containerColor = if (isFocusLocked) Color(0xFF1B5E20) else Color(0xFF37474F)
-                        ),
-                        modifier = Modifier.width(140.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (isFocusLocked) Icons.Default.Lock else Icons.Default.LockOpen,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp),
-                            tint = Color.White
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isFocusLocked) "Foco Fijado" else "Fijar Foco",
-                            color = Color.White,
-                            fontSize = 13.sp
-                        )
-                    }
+                FilledTonalButton(
+                    onClick = {
+                        if (isFocusLocked) viewModel.unlockFocus()
+                        else viewModel.lockFocusAndExposure()
+                    },
+                    enabled = !isRecording,
+                    colors = ButtonDefaults.filledTonalButtonColors(
+                        containerColor = if (isFocusLocked) Color(0xFF1B5E20) else Color(0xFF37474F)
+                    ),
+                    modifier = Modifier.width(140.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isFocusLocked) Icons.Default.Lock else Icons.Default.LockOpen,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (isFocusLocked) "Foco Fijado" else "Fijar Foco",
+                        color = Color.White,
+                        fontSize = 13.sp
+                    )
                 }
 
-                // Botón principal Iniciar / Cancelar / Reset
+                // Botón principal
                 when {
                     isRecording -> {
-                        // Cancelar grabación
                         Button(
                             onClick = { viewModel.cancelRecording() },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
@@ -283,7 +266,6 @@ fun CameraScreen(
                         }
                     }
                     recordingState is RecordingState.Finished || recordingState is RecordingState.Error -> {
-                        // Resetear
                         Button(
                             onClick = { viewModel.reset() },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0)),
@@ -295,7 +277,6 @@ fun CameraScreen(
                         }
                     }
                     else -> {
-                        // Iniciar
                         Button(
                             onClick = { viewModel.startProtocol(context) },
                             colors = ButtonDefaults.buttonColors(
