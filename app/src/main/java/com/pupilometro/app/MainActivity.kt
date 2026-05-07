@@ -1,6 +1,7 @@
 package com.pupilometro.app
 
 import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -54,17 +55,25 @@ fun PupilometroApp(
 ) {
     val navController = rememberNavController()
 
-    val permissions = rememberMultiplePermissionsState(
-        permissions = listOf(
-            Manifest.permission.CAMERA,
-            Manifest.permission.RECORD_AUDIO
-        )
-    )
+    // En Android 8/9 también se necesita WRITE_EXTERNAL_STORAGE
+    val requiredPermissions = remember {
+        buildList {
+            add(Manifest.permission.CAMERA)
+            add(Manifest.permission.RECORD_AUDIO)
+            if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+                // Android 8.0 / 8.1 / 9 — necesita permiso explícito de escritura
+                add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
+        }
+    }
+
+    val permissions = rememberMultiplePermissionsState(permissions = requiredPermissions)
 
     if (!permissions.allPermissionsGranted) {
         PermissionsScreen(
             onRequestPermissions = { permissions.launchMultiplePermissionRequest() },
-            shouldShowRationale = permissions.shouldShowRationale
+            shouldShowRationale = permissions.shouldShowRationale,
+            isAndroid8 = Build.VERSION.SDK_INT <= Build.VERSION_CODES.P
         )
     } else {
         NavHost(navController = navController, startDestination = "camera") {
@@ -82,9 +91,7 @@ fun PupilometroApp(
                 )
             }
             composable("about") {
-                AboutScreen(
-                    onNavigateBack = { navController.popBackStack() }
-                )
+                AboutScreen(onNavigateBack = { navController.popBackStack() })
             }
         }
     }
@@ -93,12 +100,11 @@ fun PupilometroApp(
 @Composable
 fun PermissionsScreen(
     onRequestPermissions: () -> Unit,
-    shouldShowRationale: Boolean
+    shouldShowRationale: Boolean,
+    isAndroid8: Boolean = false
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF0D1117)),
+        modifier = Modifier.fillMaxSize().background(Color(0xFF0D1117)),
         contentAlignment = Alignment.Center
     ) {
         Column(
@@ -115,10 +121,14 @@ fun PermissionsScreen(
             )
             Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = if (shouldShowRationale)
-                    "Esta app necesita acceso a la cámara y al micrófono para grabar el protocolo de evaluación pupilar."
-                else
-                    "Para funcionar, Pupilómetro necesita permisos de cámara y micrófono.",
+                text = when {
+                    shouldShowRationale ->
+                        "Esta app necesita acceso a la cámara, micrófono y almacenamiento para grabar el protocolo de evaluación pupilar."
+                    isAndroid8 ->
+                        "Se necesitan permisos de cámara, micrófono y almacenamiento (para guardar el video en tu dispositivo)."
+                    else ->
+                        "Para funcionar, Pupilómetro necesita permisos de cámara y micrófono."
+                },
                 color = Color.White.copy(alpha = 0.7f),
                 fontSize = 15.sp,
                 textAlign = TextAlign.Center,

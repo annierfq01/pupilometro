@@ -3,6 +3,8 @@
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Necesario para escribir en Movies/ en Android 8 y 9 -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
@@ -18,7 +20,13 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Pupilometro">
+        android:theme="@style/Theme.Pupilometro"
+        android:requestLegacyExternalStorage="true">
+        <!--
+            android:requestLegacyExternalStorage="true" es CRÍTICO para Android 9
+            Permite acceso directo a /sdcard/Movies/ sin Scoped Storage
+            En Android 10+ esta flag es ignorada (usa MediaStore automáticamente)
+        -->
 
         <activity
             android:name=".MainActivity"
