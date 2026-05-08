@@ -1,23 +1,29 @@
 package com.pupilometro.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.pupilometro.app.data.VideoQualityOption
 import com.pupilometro.app.viewmodel.SettingsViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,27 +36,16 @@ fun SettingsScreen(
     val settings by viewModel.settings.collectAsState()
     val saveSuccess by viewModel.saveSuccess.collectAsState()
 
-    // Campos locales (en texto para el TextField)
-    var basalText by remember(settings.tiempoBasal) {
-        mutableStateOf(settings.tiempoBasal.toString())
-    }
-    var flashText by remember(settings.duracionFlash) {
-        mutableStateOf(settings.duracionFlash.toString())
-    }
-    var redilatText by remember(settings.tiempoRedilatacion) {
-        mutableStateOf(settings.tiempoRedilatacion.toString())
-    }
+    var basalText by remember(settings.tiempoBasal) { mutableStateOf(settings.tiempoBasal.toString()) }
+    var flashText by remember(settings.duracionFlash) { mutableStateOf(settings.duracionFlash.toString()) }
+    var redilatText by remember(settings.tiempoRedilatacion) { mutableStateOf(settings.tiempoRedilatacion.toString()) }
 
-    // Calcular duración total
     val totalSec = ((basalText.toLongOrNull() ?: 0L) +
             (flashText.toLongOrNull() ?: 0L) +
             (redilatText.toLongOrNull() ?: 0L)) / 1000.0
 
-    LaunchedEffect(Unit) {
-        viewModel.init(context)
-    }
+    LaunchedEffect(Unit) { viewModel.init(context) }
 
-    // Snackbar al guardar
     LaunchedEffect(saveSuccess) {
         if (saveSuccess) {
             kotlinx.coroutines.delay(1500)
@@ -62,9 +57,7 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text("Ajustes del Protocolo", fontWeight = FontWeight.Bold)
-                },
+                title = { Text("Ajustes del Protocolo", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
@@ -79,7 +72,6 @@ fun SettingsScreen(
         },
         containerColor = Color(0xFF161B22)
     ) { padding ->
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -96,65 +88,52 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        "Protocolo de grabación",
-                        color = Color(0xFF4FC3F7),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
-                    )
+                    Text("Protocolo de grabación", color = Color(0xFF4FC3F7),
+                        fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        "La grabación se divide en 3 fases:\n" +
                         "1. 📹 Fase Basal: pupila en reposo\n" +
                         "2. ⚡ Estímulo de flash: contracción pupilar\n" +
                         "3. 👁️ Redilatación: recuperación tras el flash",
-                        color = Color.White.copy(alpha = 0.75f),
-                        fontSize = 13.sp,
-                        lineHeight = 20.sp
+                        color = Color.White.copy(alpha = 0.75f), fontSize = 13.sp, lineHeight = 20.sp
                     )
                 }
             }
 
-            // --- Campo: Tiempo Basal ---
+            // Tiempo Basal
             SettingsField(
-                label = "Tiempo Basal",
-                value = basalText,
+                label = "Tiempo Basal", value = basalText,
                 onValueChange = {
                     basalText = it
                     it.toLongOrNull()?.let { ms -> viewModel.updateTiempoBasal(ms) }
                 },
                 description = "Milisegundos de grabación ANTES del flash",
-                example = "Ej: 2000 = 2 segundos",
-                color = Color(0xFF4CAF50)
+                example = "Ej: 2000 = 2 segundos", color = Color(0xFF4CAF50)
             )
 
-            // --- Campo: Duración Flash ---
+            // Duración Flash
             SettingsField(
-                label = "Duración del Flash",
-                value = flashText,
+                label = "Duración del Flash", value = flashText,
                 onValueChange = {
                     flashText = it
                     it.toLongOrNull()?.let { ms -> viewModel.updateDuracionFlash(ms) }
                 },
                 description = "Milisegundos que el flash estará encendido",
-                example = "Ej: 1000 = 1 segundo",
-                color = Color(0xFFFFD600)
+                example = "Ej: 1000 = 1 segundo", color = Color(0xFFFFD600)
             )
 
-            // --- Campo: Tiempo Redilatación ---
+            // Tiempo Redilatación
             SettingsField(
-                label = "Tiempo de Redilatación",
-                value = redilatText,
+                label = "Tiempo de Redilatación", value = redilatText,
                 onValueChange = {
                     redilatText = it
                     it.toLongOrNull()?.let { ms -> viewModel.updateTiempoRedilatacion(ms) }
                 },
                 description = "Milisegundos de grabación DESPUÉS del flash",
-                example = "Ej: 5000 = 5 segundos",
-                color = Color(0xFF2196F3)
+                example = "Ej: 5000 = 5 segundos", color = Color(0xFF2196F3)
             )
 
-            // --- Duración total ---
+            // Duración total
             Card(
                 colors = CardDefaults.cardColors(containerColor = Color(0xFF1C2128)),
                 modifier = Modifier.fillMaxWidth()
@@ -165,30 +144,49 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Duración total del video:", color = Color.White, fontSize = 14.sp)
-                    Text(
-                        "${"%.1f".format(totalSec)} segundos",
-                        color = Color(0xFF4FC3F7),
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
+                    Text("${"%.1f".format(totalSec)} segundos",
+                        color = Color(0xFF4FC3F7), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
             }
 
-            // --- Botón Guardar ---
+            // ── Sección Calidad de Video ──────────────────────────────────────
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.width(4.dp).height(20.dp).background(Color(0xFFFF6F00)))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Calidad de Video", color = Color.White,
+                        fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "Si el dispositivo no soporta la calidad elegida, usará la siguiente disponible.",
+                    color = Color.White.copy(alpha = 0.5f), fontSize = 12.sp
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                VideoQualityOption.entries.forEach { option ->
+                    val isSelected = settings.videoQuality == option
+                    QualityOptionRow(
+                        option = option,
+                        isSelected = isSelected,
+                        onClick = { viewModel.updateVideoQuality(option) }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+            }
+
+            // Botón Guardar
             Button(
                 onClick = { viewModel.saveSettings() },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0))
             ) {
-                if (saveSuccess) {
-                    Icon(Icons.Default.Save, contentDescription = null, tint = Color.White)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("¡Guardado! Volviendo...", color = Color.White, fontWeight = FontWeight.Bold)
-                } else {
-                    Icon(Icons.Default.Save, contentDescription = null, tint = Color.White)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Guardar Ajustes", color = Color.White, fontWeight = FontWeight.Bold)
-                }
+                Icon(Icons.Default.Save, contentDescription = null, tint = Color.White)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    if (saveSuccess) "¡Guardado! Volviendo..." else "Guardar Ajustes",
+                    color = Color.White, fontWeight = FontWeight.Bold
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -197,37 +195,69 @@ fun SettingsScreen(
 }
 
 @Composable
+private fun QualityOptionRow(
+    option: VideoQualityOption,
+    isSelected: Boolean,
+    onClick: () -> Unit
+) {
+    val borderColor = if (isSelected) Color(0xFF4FC3F7) else Color.White.copy(alpha = 0.1f)
+    val bgColor = if (isSelected) Color(0xFF1565C0).copy(alpha = 0.25f) else Color(0xFF1C2128)
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(bgColor)
+            .border(1.dp, borderColor, RoundedCornerShape(10.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = option.label,
+                color = if (isSelected) Color(0xFF4FC3F7) else Color.White,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                fontSize = 14.sp
+            )
+            Text(
+                text = option.description,
+                color = Color.White.copy(alpha = 0.5f),
+                fontSize = 12.sp
+            )
+        }
+        if (isSelected) {
+            Icon(
+                Icons.Default.Check,
+                contentDescription = "Seleccionado",
+                tint = Color(0xFF4FC3F7),
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
 private fun SettingsField(
-    label: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    description: String,
-    example: String,
-    color: Color
+    label: String, value: String, onValueChange: (String) -> Unit,
+    description: String, example: String, color: Color
 ) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(
-                modifier = Modifier
-                    .width(4.dp)
-                    .height(20.dp)
-                    .background(color)
-            )
+            Box(modifier = Modifier.width(4.dp).height(20.dp).background(color))
             Spacer(modifier = Modifier.width(10.dp))
             Text(label, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
         }
         Spacer(modifier = Modifier.height(4.dp))
         OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
+            value = value, onValueChange = onValueChange,
             modifier = Modifier.fillMaxWidth(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             suffix = { Text("ms", color = Color.White.copy(alpha = 0.5f)) },
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedBorderColor = color,
-                unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
+                focusedTextColor = Color.White, unfocusedTextColor = Color.White,
+                focusedBorderColor = color, unfocusedBorderColor = Color.White.copy(alpha = 0.3f),
                 cursorColor = color
             ),
             singleLine = true

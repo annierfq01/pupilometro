@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pupilometro.app.data.PupilometroSettings
 import com.pupilometro.app.data.SettingsRepository
+import com.pupilometro.app.data.VideoQualityOption
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -23,23 +24,14 @@ class SettingsViewModel : ViewModel() {
     fun init(context: Context) {
         repository = SettingsRepository(context)
         viewModelScope.launch {
-            repository!!.settingsFlow.collect { s ->
-                _settings.value = s
-            }
+            repository!!.settingsFlow.collect { s -> _settings.value = s }
         }
     }
 
-    fun updateTiempoBasal(ms: Long) {
-        _settings.value = _settings.value.copy(tiempoBasal = ms)
-    }
-
-    fun updateDuracionFlash(ms: Long) {
-        _settings.value = _settings.value.copy(duracionFlash = ms)
-    }
-
-    fun updateTiempoRedilatacion(ms: Long) {
-        _settings.value = _settings.value.copy(tiempoRedilatacion = ms)
-    }
+    fun updateTiempoBasal(ms: Long)          { _settings.value = _settings.value.copy(tiempoBasal = ms) }
+    fun updateDuracionFlash(ms: Long)        { _settings.value = _settings.value.copy(duracionFlash = ms) }
+    fun updateTiempoRedilatacion(ms: Long)   { _settings.value = _settings.value.copy(tiempoRedilatacion = ms) }
+    fun updateVideoQuality(q: VideoQualityOption) { _settings.value = _settings.value.copy(videoQuality = q) }
 
     fun saveSettings() {
         viewModelScope.launch {
@@ -48,7 +40,5 @@ class SettingsViewModel : ViewModel() {
         }
     }
 
-    fun clearSaveSuccess() {
-        _saveSuccess.value = false
-    }
+    fun clearSaveSuccess() { _saveSuccess.value = false }
 }

@@ -42,6 +42,7 @@ fun CameraScreen(
     val progressMs by viewModel.progressMs.collectAsState()
     val totalDurationMs by viewModel.totalDurationMs.collectAsState()
 
+    val activeQualityLabel by viewModel.activeQualityLabel.collectAsState()
     val isRecording = recordingState is RecordingState.RecordingBasal ||
             recordingState is RecordingState.FlashOn ||
             recordingState is RecordingState.RecordingRecovery
@@ -78,7 +79,7 @@ fun CameraScreen(
             factory = { ctx ->
                 val pv = PreviewView(ctx).apply {
                     implementationMode = PreviewView.ImplementationMode.COMPATIBLE
-                    scaleType = PreviewView.ScaleType.FILL_CENTER
+                    scaleType = PreviewView.ScaleType.FIT_CENTER
                 }
                 viewModel.bindCamera(ctx, lifecycleOwner, pv)
                 pv

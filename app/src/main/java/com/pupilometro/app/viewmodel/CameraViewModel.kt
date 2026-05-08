@@ -28,6 +28,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.pupilometro.app.data.PupilometroSettings
 import com.pupilometro.app.data.SettingsRepository
+import com.pupilometro.app.data.VideoQualityOption
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,7 +39,6 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-/** Estados posibles de la grabación */
 sealed class RecordingState {
     object Idle : RecordingState()
     object WaitingFocusLock : RecordingState()
@@ -68,6 +68,10 @@ class CameraViewModel : ViewModel() {
     private val _totalDurationMs = MutableStateFlow(0L)
     val totalDurationMs: StateFlow<Long> = _totalDurationMs.asStateFlow()
 
+    // Calidad activa mostrada en UI
+    private val _activeQualityLabel = MutableStateFlow("—")
+    val activeQualityLabel: StateFlow<String> = _activeQualityLabel.asStateFlow()
+
     private var camera: Camera? = null
     private var cameraControl: CameraControl? = null
     private var videoCapture: VideoCapture<Recorder>? = null
@@ -86,6 +90,29 @@ class CameraViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Construye el QualitySelector según la preferencia del usuario.
+     * AUTO = lista completa de mayor a menor, el dispositivo elige la máxima soportada.
+     * Cualquier otra opción = esa calidad primero, con fallback a la siguiente inferior.
+     */
+    private fun buildQualitySelector(quality: VideoQualityOption): QualitySelector {
+        return when (quality) {
+            VideoQualityOption.AUTO -> QualitySelector.fromOrderedList(
+                listOf(Quality.UHD, Quality.FHD, Quality.HD, Quality.SD)
+            )
+            VideoQualityOption.UHD -> QualitySelector.fromOrderedList(
+                listOf(Quality.UHD, Quality.FHD, Quality.HD, Quality.SD)
+            )
+            VideoQualityOption.FHD -> QualitySelector.fromOrderedList(
+                listOf(Quality.FHD, Quality.HD, Quality.SD)
+            )
+            VideoQualityOption.HD -> QualitySelector.fromOrderedList(
+                listOf(Quality.HD, Quality.SD)
+            )
+            VideoQualityOption.SD -> QualitySelector.from(Quality.SD)
+        }
+    }
+
     fun bindCamera(
         context: Context,
         lifecycleOwner: LifecycleOwner,
@@ -99,15 +126,16 @@ class CameraViewModel : ViewModel() {
                 .build()
                 .also { it.setSurfaceProvider(previewView.surfaceProvider) }
 
+            val qualitySelector = buildQualitySelector(currentSettings.videoQuality)
+
             val recorder = Recorder.Builder()
-                .setQualitySelector(
-                    QualitySelector.fromOrderedList(
-                        listOf(Quality.FHD, Quality.HD, Quality.SD)
-                    )
-                )
+                .setQualitySelector(qualitySelector)
                 .build()
 
             videoCapture = VideoCapture.withOutput(recorder)
+
+            // Actualizar etiqueta de calidad activa
+            _activeQualityLabel.value = currentSettings.videoQuality.label
 
             try {
                 cameraProvider.unbindAll()
@@ -118,7 +146,7 @@ class CameraViewModel : ViewModel() {
                     videoCapture
                 )
                 cameraControl = camera?.cameraControl
-                Log.d(TAG, "Cámara vinculada. API level: ${Build.VERSION.SDK_INT}")
+                Log.d(TAG, "Cámara vinculada. Calidad: ${currentSettings.videoQuality.name}, API: ${Build.VERSION.SDK_INT}")
             } catch (e: Exception) {
                 Log.e(TAG, "Error al vincular cámara: ${e.message}")
                 _recordingState.value = RecordingState.Error("Error de cámara: ${e.message}")
@@ -129,10 +157,8 @@ class CameraViewModel : ViewModel() {
     fun tapToFocus(meteringPointFactory: MeteringPointFactory, x: Float, y: Float) {
         val point = meteringPointFactory.createPoint(x, y)
         val action = FocusMeteringAction.Builder(
-            point,
-            FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
+            point, FocusMeteringAction.FLAG_AF or FocusMeteringAction.FLAG_AE
         ).setAutoCancelDuration(5, TimeUnit.SECONDS).build()
-
         cameraControl?.startFocusAndMetering(action)
         _isFocusLocked.value = false
         _statusMessage.value = "Enfocando... Presiona 'Fijar Foco' cuando esté nítido."
@@ -155,7 +181,6 @@ class CameraViewModel : ViewModel() {
             _statusMessage.value = "⚠️ Debes fijar el foco antes de grabar."
             return
         }
-
         val vc = videoCapture ?: run {
             _recordingState.value = RecordingState.Error("Cámara no disponible.")
             return
@@ -169,22 +194,13 @@ class CameraViewModel : ViewModel() {
             .format(System.currentTimeMillis())
         val fileName = "Pupilometro_$timestamp"
 
-        // ─────────────────────────────────────────────────────────────────
-        // COMPATIBILIDAD Android 8 (API 26-28) vs Android 10+ (API 29+)
-        // En API < 29 RELATIVE_PATH no existe → guardar directo en File
-        // En API >= 29 usar MediaStore con RELATIVE_PATH
-        // ─────────────────────────────────────────────────────────────────
-
         @Suppress("MissingPermission")
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Android 10+ → MediaStore con RELATIVE_PATH
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                 put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-                put(
-                    MediaStore.Video.Media.RELATIVE_PATH,
-                    Environment.DIRECTORY_MOVIES + "/Pupilometro"
-                )
+                put(MediaStore.Video.Media.RELATIVE_PATH,
+                    Environment.DIRECTORY_MOVIES + "/Pupilometro")
             }
             val outputOptions = MediaStoreOutputOptions.Builder(
                 context.contentResolver,
@@ -197,18 +213,11 @@ class CameraViewModel : ViewModel() {
                 .start(ContextCompat.getMainExecutor(context)) { event ->
                     handleRecordEvent(event, "Movies/Pupilometro/$fileName.mp4")
                 }
-
         } else {
-            // Android 8 / 9 → FileOutputOptions directo al sistema de archivos
-            // Guardar en Movies/Pupilometro/ o en app-specific si no hay permiso
-            val moviesDir = Environment.getExternalStoragePublicDirectory(
-                Environment.DIRECTORY_MOVIES
-            )
+            // Android 8 / 9
+            val moviesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES)
             val outputDir = File(moviesDir, "Pupilometro").also { it.mkdirs() }
             val outputFile = File(outputDir, "$fileName.mp4")
-
-            Log.d(TAG, "Android <10: guardando en ${outputFile.absolutePath}")
-
             val outputOptions = FileOutputOptions.Builder(outputFile).build()
 
             activeRecording = vc.output
@@ -219,11 +228,9 @@ class CameraViewModel : ViewModel() {
                 }
         }
 
-        // Ejecutar protocolo de tiempos
         viewModelScope.launch {
             val startTime = System.currentTimeMillis()
 
-            // FASE 1: BASAL
             _recordingState.value = RecordingState.RecordingBasal
             _statusMessage.value = "📹 Fase basal (${settings.tiempoBasal / 1000}s)..."
             _progressMs.value = 0L
@@ -233,7 +240,6 @@ class CameraViewModel : ViewModel() {
                 delay(50)
             }
 
-            // FASE 2: FLASH
             _recordingState.value = RecordingState.FlashOn
             _statusMessage.value = "⚡ Flash encendido (${settings.duracionFlash / 1000}s)..."
             cameraControl?.enableTorch(true)
@@ -244,7 +250,6 @@ class CameraViewModel : ViewModel() {
             }
             cameraControl?.enableTorch(false)
 
-            // FASE 3: REDILATACIÓN
             _recordingState.value = RecordingState.RecordingRecovery
             _statusMessage.value = "👁️ Redilatación (${settings.tiempoRedilatacion / 1000}s)..."
             val recoveryEnd = flashEnd + settings.tiempoRedilatacion
@@ -254,45 +259,36 @@ class CameraViewModel : ViewModel() {
             }
             _progressMs.value = _totalDurationMs.value
 
-            // FINALIZAR — dar 500ms extra para que el buffer de video se vacíe
-            // antes de llamar stop(), crítico en dispositivos lentos como Android 8
-            delay(500)
+            delay(500) // Buffer flush — crítico en Android 8
             activeRecording?.stop()
             activeRecording = null
         }
     }
 
-    /**
-     * Maneja los eventos del grabador de video.
-     * Función separada para no duplicar código entre las dos rutas (API 29+ y API <29).
-     */
     private fun handleRecordEvent(event: VideoRecordEvent, filePath: String) {
         when (event) {
-            is VideoRecordEvent.Start -> {
-                Log.d(TAG, "Grabación iniciada correctamente")
-            }
-            is VideoRecordEvent.Status -> {
-                // Evento periódico con stats — útil para debug
+            is VideoRecordEvent.Start ->
+                Log.d(TAG, "Grabación iniciada")
+            is VideoRecordEvent.Status ->
                 Log.v(TAG, "Grabando: ${event.recordingStats.numBytesRecorded} bytes")
-            }
             is VideoRecordEvent.Finalize -> {
                 if (event.hasError()) {
                     val errorMsg = when (event.error) {
                         VideoRecordEvent.Finalize.ERROR_INSUFFICIENT_STORAGE ->
                             "Sin espacio de almacenamiento"
                         VideoRecordEvent.Finalize.ERROR_FILE_SIZE_LIMIT_REACHED ->
-                            "Límite de tamaño de archivo alcanzado"
+                            "Límite de tamaño de archivo"
                         VideoRecordEvent.Finalize.ERROR_NO_VALID_DATA ->
-                            "No se capturaron datos válidos (¿permisos?)"
+                            "Sin datos válidos (¿permisos?)"
                         VideoRecordEvent.Finalize.ERROR_SOURCE_INACTIVE ->
-                            "La cámara se desactivó durante la grabación"
+                            "Cámara desactivada durante grabación"
                         else -> "Error código: ${event.error}"
                     }
-                    Log.e(TAG, "Error al finalizar: $errorMsg")
+                    Log.e(TAG, "Error: $errorMsg")
                     _recordingState.value = RecordingState.Error(errorMsg)
                     _statusMessage.value = "❌ $errorMsg"
                 } else {
-                    Log.d(TAG, "Video guardado en: $filePath")
+                    Log.d(TAG, "Guardado en: $filePath")
                     _recordingState.value = RecordingState.Finished(filePath)
                     _statusMessage.value = "✅ Video guardado en:\n$filePath"
                 }
